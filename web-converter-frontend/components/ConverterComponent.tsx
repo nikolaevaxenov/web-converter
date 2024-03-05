@@ -42,9 +42,9 @@ export default function AlgebraConverterComponent() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-col lg:flex-row gap-5">
+      <div className="flex flex-col gap-5 lg:flex-row">
         <div className="flex flex-auto flex-col gap-5">
-          <div className="flex flex-col lg:flex-row items-center gap-1.5">
+          <div className="flex flex-col items-center gap-1.5 lg:flex-row">
             <Label htmlFor="group">Группа:</Label>
             <Input id="group" type="text" />
 
@@ -64,11 +64,11 @@ export default function AlgebraConverterComponent() {
               </SelectContent>
             </Select>
           </div>
-          <div className="grid lg:grid-cols-2 gap-x-5 gap-y-1.5">
-            <div className="flex items-center order-1 lg:order-none">
+          <div className="grid gap-x-5 gap-y-1.5 lg:grid-cols-2">
+            <div className="order-1 flex items-center lg:order-none">
               <Label htmlFor="description">Описание запроса:</Label>
             </div>
-            <div className="flex items-center justify-between order-3 lg:order-none">
+            <div className="order-3 flex items-center justify-between lg:order-none">
               <Label htmlFor="variable-types">Типы переменных:</Label>
               <Popover>
                 <PopoverTrigger asChild>
@@ -116,11 +116,11 @@ export default function AlgebraConverterComponent() {
               <Textarea className="resize-none" id="variable-types" />
             </div>
           </div>
-          <div className="flex flex-col grow gap-1.5">
+          <div className="flex grow flex-col gap-1.5">
             <Label htmlFor="target-list">Целевой список:</Label>
             <Input id="target-list" type="text" />
           </div>
-          <div className="flex flex-col lg:flex-row gap-5">
+          <div className="flex flex-col gap-5 lg:flex-row">
             <Textarea className="resize-none" id="input-query" />
             <Textarea className="resize-none" id="output-query" />
           </div>
