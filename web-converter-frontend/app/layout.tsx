@@ -1,6 +1,7 @@
 import { Providers } from "./providers";
 import Head from "./head";
 import "@/styles/globals.css";
+import { Toaster } from "@/components/ui/toaster";
 
 export default function RootLayout({
   children,
@@ -10,11 +11,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <Head />
-
       <body>
         <Providers>
-          <div className="wrapper">
-            <main className="wrapper__content">{children}</main>
+          <div>
+            <main>{children}</main>
+            <Toaster />
           </div>
         </Providers>
       </body>

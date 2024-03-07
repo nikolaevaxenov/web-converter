@@ -1,16 +1,23 @@
 "use client";
 
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Separator } from "@/components/ui/separator";
 import {
   Table,
   TableBody,
@@ -19,12 +26,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/components/ui/use-toast";
+import { createView, executeSQL, getAllTables } from "@/services/genericData";
+import { Query, QueryName, SQLQuery, TableName } from "@/types/Query";
+import { emptyQueryStringsToNull, generateLetter } from "@/utils/tools";
 import {
   Check,
   Pen,
@@ -35,109 +41,406 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { SubmitHandler, useForm } from "react-hook-form";
+import { useMutation, useQuery } from "react-query";
 
-export default function AlgebraConverterComponent() {
-  const [toggleResultTable, setToggleResultTable] = useState(true);
+export default function ConverterComponent({
+  converterType,
+}: {
+  converterType: string;
+}) {
+  const {
+    addQuery,
+    deleteQuery,
+    editQuery,
+    getAllQueriesNames,
+    getQueryById,
+  } = require(`@/services/${converterType}Data`);
+
+  const [toggleResultTable, setToggleResultTable] = useState(false);
+  const [selectedQuery, setSelectedQuery] = useState(0);
+  const { toast } = useToast();
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setValue,
+    getValues,
+    formState: { errors },
+  } = useForm<Query>();
+  const sqlQueryForm = useForm<SQLQuery>();
+
+  const getAllQueriesNamesData = useQuery<QueryName[]>(
+    "getAllQueriesNames",
+    getAllQueriesNames
+  );
+  const getQueryByIdData = useQuery(
+    ["getQueryById", selectedQuery],
+    () => getQueryById(selectedQuery),
+    {
+      enabled: false,
+    }
+  );
+  const deleteQueryData = useQuery(
+    ["deleteQuery", selectedQuery],
+    () => deleteQuery(selectedQuery),
+    {
+      enabled: false,
+    }
+  );
+  const getAllTablesData = useQuery("getAllTables", getAllTables);
+
+  const addQueryMutation = useMutation({
+    mutationFn: (data: Query) => addQuery(data),
+    onSuccess: (data: { id: number }) => {
+      getAllQueriesNamesData.refetch().then(() => {
+        setSelectedQuery(data.id);
+        toast({
+          title: "Успех",
+          description: "Запрос успешно сохранен!",
+        });
+      });
+    },
+  });
+  const editQueryMutation = useMutation({
+    mutationFn: (data: { queryId: number; query: Query }) => editQuery(data),
+    onSuccess: () => {
+      getAllQueriesNamesData.refetch();
+      toast({
+        title: "Успех",
+        description: "Запрос успешно изменен!",
+      });
+    },
+  });
+  const executeSQLMutation = useMutation(executeSQL, {
+    onSuccess: () => {
+      setToggleResultTable(true);
+    },
+  });
+  const createViewMutation = useMutation(createView, {
+    onSuccess: (data) => {
+      toast({
+        title: "Успех",
+        description: `View запроса с названием ${data} успешно создан!`,
+      });
+    },
+  });
+
+  const onSaveQuerySubmit: SubmitHandler<Query> = (data) => {
+    emptyQueryStringsToNull(data);
+    addQueryMutation.mutate(data);
+  };
+  const onEditQuerySubmit: SubmitHandler<Query> = (data) => {
+    if (selectedQuery === 0) {
+      toast({
+        title: "Ошибка",
+        description: "Для изменения запроса необходимо его выбрать!",
+      });
+    } else {
+      emptyQueryStringsToNull(data);
+      editQueryMutation.mutate({ queryId: selectedQuery, query: data });
+    }
+  };
+  const onExecuteSQLSubmit: SubmitHandler<SQLQuery> = (data) => {
+    executeSQLMutation.mutate({
+      sql_query: data.sql_query,
+    });
+  };
+  const onCreateViewSubmit: SubmitHandler<SQLQuery> = (data) => {
+    const getQueryFormData = handleSubmit((data) => {
+      return data;
+    });
+    getQueryFormData().then(() => {
+      const queryFormData = getValues(["query_id", "query_group", "last_name"]);
+      if (!queryFormData.includes("")) {
+        createViewMutation.mutate({
+          title: `${queryFormData[0]}_${queryFormData[1]}_${queryFormData[2]}`,
+          sql_query: data.sql_query,
+        });
+      }
+    });
+  };
+
+  useEffect(() => {
+    if (deleteQueryData.isSuccess) {
+      getAllQueriesNamesData.refetch();
+      setSelectedQuery(0);
+      reset();
+      toast({
+        title: "Успех",
+        description: "Запрос успешно удален!",
+      });
+    }
+  }, [deleteQueryData.isSuccess]);
+
+  useEffect(() => {
+    getQueryByIdData.refetch();
+  }, [selectedQuery]);
+
+  const letterGenerator = generateLetter();
 
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-5 lg:flex-row">
-        <div className="flex flex-auto flex-col gap-5">
-          <div className="flex flex-col items-center gap-1.5 lg:flex-row">
-            <Label htmlFor="group">Группа:</Label>
-            <Input id="group" type="text" />
+        <form className="flex flex-auto">
+          <div className="flex flex-auto flex-col gap-5">
+            <div className="flex flex-col items-center gap-1.5 lg:flex-row">
+              <Label htmlFor="group">Группа:</Label>
+              <Input
+                className={errors.query_group ? "border-red-700" : ""}
+                id="group"
+                type="text"
+                {...register("query_group", { required: true, minLength: 1 })}
+              />
+              {errors.query_group && (
+                <div className="text-center text-sm text-red-700">
+                  Это поле обязательно!
+                </div>
+              )}
 
-            <Label htmlFor="last-name">Фамилия:</Label>
-            <Input id="last-name" type="text" />
+              <Label htmlFor="last-name">Фамилия:</Label>
+              <Input
+                className={errors.last_name ? "border-red-700" : ""}
+                id="last-name"
+                type="text"
+                {...register("last_name", { required: true, minLength: 1 })}
+              />
+              {errors.last_name && (
+                <div className="text-center text-sm text-red-700">
+                  Это поле обязательно!
+                </div>
+              )}
 
-            <Label htmlFor="identification-number">Номер запроса:</Label>
-            <Input id="identification-number" type="text" />
-            <Select>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Запрос" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="light">N00D_New_Shchukin</SelectItem>
-                <SelectItem value="dark">N035_New_Shchukin</SelectItem>
-                <SelectItem value="system">X001_EXP_Shchu</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-x-5 gap-y-1.5 lg:grid-cols-2">
-            <div className="order-1 flex items-center lg:order-none">
-              <Label htmlFor="description">Описание запроса:</Label>
+              <Label htmlFor="identification-number">Номер запроса:</Label>
+              <Input
+                className={errors.query_id ? "border-red-700" : ""}
+                id="identification-number"
+                type="text"
+                {...register("query_id", { required: true, minLength: 1 })}
+              />
+              {errors.query_id && (
+                <div className="text-center text-sm text-red-700">
+                  Это поле обязательно!
+                </div>
+              )}
+
+              {!!getAllQueriesNamesData.data ? (
+                <select
+                  value={selectedQuery.toString()}
+                  onChange={(e) => setSelectedQuery(parseInt(e.target.value))}
+                  className="flex h-10 w-full items-center justify-between rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1"
+                >
+                  <option value="0" disabled hidden>
+                    Запрос
+                  </option>
+                  {getAllQueriesNamesData.data.map((row: QueryName) => (
+                    <option key={row.id} value={row.id.toString()}>
+                      {`${row.query_id}_${row.query_group}_${row.last_name}`}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <p>Загрузка...</p>
+              )}
             </div>
-            <div className="order-3 flex items-center justify-between lg:order-none">
-              <Label htmlFor="variable-types">Типы переменных:</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" title="Добавить переменную">
-                    <Plus />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-80">
-                  <div className="flex flex-col gap-1.5">
-                    <Button variant="outline">
-                      <Plus className="mr-1" /> queryalgb
-                    </Button>
-                    <Button variant="outline">
-                      <Plus className="mr-1" /> querytupl
-                    </Button>
-                    <Button variant="outline">
-                      <Plus className="mr-1" /> выполнение
-                    </Button>
-                    <Button variant="outline">
-                      <Plus className="mr-1" /> группы
-                    </Button>
-                    <Button variant="outline">
-                      <Plus className="mr-1" /> календарныйплан
-                    </Button>
-                    <Button variant="outline">
-                      <Plus className="mr-1" /> курслекций
-                    </Button>
-                    <Button variant="outline">
-                      <Plus className="mr-1" /> регби
-                    </Button>
-                    <Button variant="outline">
-                      <Plus className="mr-1" /> студенты
-                    </Button>
-                    <Button variant="outline">
-                      <Plus className="mr-1" /> худгимнастика
-                    </Button>
+            <div className="grid gap-x-5 gap-y-1.5 lg:grid-cols-2">
+              <div className="order-1 flex items-end lg:order-none">
+                <Label htmlFor="description">Описание запроса:</Label>
+              </div>
+              <div className="order-3 flex items-end justify-between lg:order-none">
+                <Label htmlFor="variable-types">Типы переменных:</Label>
+                {!!getAllTablesData.data ? (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" title="Добавить переменную">
+                        <Plus />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80">
+                      <div className="flex flex-col gap-1.5">
+                        {getAllTablesData.data.map((row: TableName) => (
+                          <Button
+                            key={row.table_name}
+                            variant="outline"
+                            onClick={() =>
+                              getValues("table_variables") === ""
+                                ? setValue(
+                                    "table_variables",
+                                    `${row.table_name} AS ${letterGenerator()}`
+                                  )
+                                : setValue(
+                                    "table_variables",
+                                    `${getValues("table_variables")}, ${
+                                      row.table_name
+                                    } AS ${letterGenerator()}`
+                                  )
+                            }
+                          >
+                            <Plus className="mr-1" /> {row.table_name}
+                          </Button>
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                ) : (
+                  <p>Загрузка...</p>
+                )}
+              </div>
+              <div className="order-2 lg:order-none">
+                <Textarea
+                  className="resize-none"
+                  id="description"
+                  {...register("description")}
+                />
+              </div>
+              <div className="order-4 lg:order-none">
+                <Textarea
+                  className="resize-none"
+                  id="variable-types"
+                  {...register("table_variables")}
+                />
+              </div>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="target-list">Целевой список:</Label>
+              <Input
+                id="target-list"
+                type="text"
+                {...register("target_list")}
+              />
+            </div>
+            <div className="flex grow flex-col gap-5 lg:flex-row">
+              <div className="flex w-full flex-col gap-1.5">
+                <Label htmlFor="input-query">Выражение:</Label>
+                <Textarea
+                  className="grow resize-none"
+                  id="input-query"
+                  {...register("query_body")}
+                />
+              </div>
+              <div className="flex w-full flex-col gap-1.5">
+                <Label htmlFor="output-query">SQL-выражение:</Label>
+                <Textarea
+                  className="grow resize-none"
+                  id="output-query"
+                  {...sqlQueryForm.register("sql_query", {
+                    required: true,
+                    minLength: 1,
+                  })}
+                />
+                {sqlQueryForm.formState.errors.sql_query && (
+                  <div className="text-center text-sm text-red-700">
+                    Это поле обязательно!
                   </div>
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div className="order-2 lg:order-none">
-              <Textarea className="resize-none" id="description" />
-            </div>
-            <div className="order-4 lg:order-none">
-              <Textarea className="resize-none" id="variable-types" />
+                )}
+              </div>
             </div>
           </div>
-          <div className="flex grow flex-col gap-1.5">
-            <Label htmlFor="target-list">Целевой список:</Label>
-            <Input id="target-list" type="text" />
-          </div>
-          <div className="flex flex-col gap-5 lg:flex-row">
-            <Textarea className="resize-none" id="input-query" />
-            <Textarea className="resize-none" id="output-query" />
-          </div>
-        </div>
+        </form>
         <div className="flex flex-col gap-3">
-          <Button>
-            <Check className="mr-2" /> Принять запрос
+          <div className="flex flex-col gap-1.5">
+            {selectedQuery === 0 ? (
+              <Button
+                className="flex grow"
+                onClick={() => {
+                  selectedQuery === 0
+                    ? toast({
+                        title: "Ошибка",
+                        description:
+                          "Для применения запроса необходимо его выбрать!",
+                      })
+                    : Object.entries(getQueryByIdData.data).forEach(
+                        ([name, value]: any) => setValue(name, value)
+                      );
+                }}
+              >
+                <Check className="mr-2" /> Принять запрос
+              </Button>
+            ) : (
+              <>
+                <Button
+                  onClick={() => {
+                    selectedQuery === 0
+                      ? toast({
+                          title: "Ошибка",
+                          description:
+                            "Для применения запроса необходимо его выбрать!",
+                        })
+                      : Object.entries(getQueryByIdData.data).forEach(
+                          ([name, value]: any) => setValue(name, value)
+                        );
+                  }}
+                >
+                  <Check className="mr-2" /> Принять запрос
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedQuery(0);
+                    reset();
+                  }}
+                >
+                  <X className="mr-2" /> Отменить выбор
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    reset();
+                  }}
+                >
+                  <Trash2 className="mr-2" /> Очистить поля
+                </Button>
+              </>
+            )}
+          </div>
+          <Button variant="secondary" onClick={handleSubmit(onSaveQuerySubmit)}>
+            <Save className="mr-2" />
+            {selectedQuery === 0
+              ? "Сохранить запрос"
+              : "Сохранить копию запроса"}
           </Button>
-          <Button variant="secondary">
-            <Save className="mr-2" /> Сохранить запрос
-          </Button>
-          <Button variant="secondary">
+          <Button variant="secondary" onClick={handleSubmit(onEditQuerySubmit)}>
             <Pen className="mr-2" /> Изменить запрос
           </Button>
-          <Button variant="destructive">
-            <Trash2 className="mr-2" /> Удалить запрос
-          </Button>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="destructive">
+                <Trash2 className="mr-2" /> Удалить запрос
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>
+                  Вы уверены, что хотите удалить этот запрос?
+                </DialogTitle>
+              </DialogHeader>
+              <DialogFooter className="sm:justify-center">
+                <DialogClose asChild>
+                  <Button type="button" variant="secondary">
+                    Нет
+                  </Button>
+                </DialogClose>
+                <DialogClose asChild>
+                  <Button
+                    variant="destructive"
+                    onClick={() => {
+                      selectedQuery === 0
+                        ? toast({
+                            title: "Ошибка",
+                            description:
+                              "Для удаления запроса необходимо его выбрать!",
+                          })
+                        : deleteQueryData.refetch();
+                    }}
+                  >
+                    Да
+                  </Button>
+                </DialogClose>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           <Separator />
           <Button>
             <Plus className="mr-2" /> Генерировать SQL
@@ -145,7 +448,11 @@ export default function AlgebraConverterComponent() {
           <div className="flex flex-row gap-1.5">
             {toggleResultTable ? (
               <>
-                <Button className="flex grow" variant="secondary">
+                <Button
+                  className="flex grow"
+                  variant="secondary"
+                  onClick={sqlQueryForm.handleSubmit(onExecuteSQLSubmit)}
+                >
                   <RefreshCcw className="mr-2" /> Обновить
                 </Button>
                 <Button
@@ -158,239 +465,47 @@ export default function AlgebraConverterComponent() {
             ) : (
               <Button
                 className="flex grow"
-                onClick={() => setToggleResultTable(true)}
+                onClick={sqlQueryForm.handleSubmit(onExecuteSQLSubmit)}
               >
                 <SendHorizontal className="mr-2" /> Выполнить SQL
               </Button>
             )}
           </div>
           <Separator />
-          <Button variant="secondary">
+          <Button
+            variant="secondary"
+            onClick={sqlQueryForm.handleSubmit(onCreateViewSubmit)}
+          >
             <Save className="mr-2" /> Создать View
           </Button>
         </div>
       </div>
       <div className="flex flex-row" id="result-table">
-        {toggleResultTable ? (
-          <Table className="border">
-            <TableHeader>
-              <TableRow>
-                <TableHead>Нз</TableHead>
-                <TableHead>Фио</TableHead>
-                <TableHead>П</TableHead>
-                <TableHead>Возр</TableHead>
-                <TableHead>Гр</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <TableRow>
-                <TableCell>ст401.1</TableCell>
-                <TableCell>Крымов В.А.</TableCell>
-                <TableCell>М</TableCell>
-                <TableCell>20</TableCell>
-                <TableCell>Б13-401</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>ст401.2</TableCell>
-                <TableCell>Хромов В.А.</TableCell>
-                <TableCell>М</TableCell>
-                <TableCell>21</TableCell>
-                <TableCell>Б13-401</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>ст401.3</TableCell>
-                <TableCell>Дронов В.С.</TableCell>
-                <TableCell>М</TableCell>
-                <TableCell>22</TableCell>
-                <TableCell>Б13-401</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>ст401.4</TableCell>
-                <TableCell>Крутов М.А.</TableCell>
-                <TableCell>М</TableCell>
-                <TableCell>22</TableCell>
-                <TableCell>Б13-401</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>ст401.5</TableCell>
-                <TableCell>Крымова А.А.</TableCell>
-                <TableCell>Ж</TableCell>
-                <TableCell>19</TableCell>
-                <TableCell>Б13-401</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>ст401.6</TableCell>
-                <TableCell>Ризина Г.Н.</TableCell>
-                <TableCell>Ж</TableCell>
-                <TableCell>20</TableCell>
-                <TableCell>Б13-401</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>ст402.1</TableCell>
-                <TableCell>Стоянов А.Т.</TableCell>
-                <TableCell>М</TableCell>
-                <TableCell>20</TableCell>
-                <TableCell>Б14-402</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>ст501.1</TableCell>
-                <TableCell>Серж С.Ю.</TableCell>
-                <TableCell>Ж</TableCell>
-                <TableCell>20</TableCell>
-                <TableCell>Б14-501</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>ст501.2</TableCell>
-                <TableCell>Котова В.И.</TableCell>
-                <TableCell>Ж</TableCell>
-                <TableCell>20</TableCell>
-                <TableCell>Б14-501</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>ст502.1</TableCell>
-                <TableCell>Дикий М.Т.</TableCell>
-                <TableCell>М</TableCell>
-                <TableCell>19</TableCell>
-                <TableCell>Б13-502</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>ст502.2</TableCell>
-                <TableCell>Озерова Т.И.</TableCell>
-                <TableCell>Ж</TableCell>
-                <TableCell>20</TableCell>
-                <TableCell>Б13-502</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>ст505.1</TableCell>
-                <TableCell>Иванова В.И.</TableCell>
-                <TableCell>Ж</TableCell>
-                <TableCell>20</TableCell>
-                <TableCell>Б14-505</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>ст505.2</TableCell>
-                <TableCell>Левина А.Ю.</TableCell>
-                <TableCell>Ж</TableCell>
-                <TableCell>21</TableCell>
-                <TableCell>Б14-505</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>ст505.3</TableCell>
-                <TableCell>Полякова С.Т.</TableCell>
-                <TableCell>Ж</TableCell>
-                <TableCell>22</TableCell>
-                <TableCell>Б14-505</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>ст505.4</TableCell>
-                <TableCell>Полин С.Т.</TableCell>
-                <TableCell>М</TableCell>
-                <TableCell>22</TableCell>
-                <TableCell>Б14-505</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>ст505.5</TableCell>
-                <TableCell>Силин С.Т.</TableCell>
-                <TableCell>М</TableCell>
-                <TableCell>22</TableCell>
-                <TableCell>Б14-505</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>ст505.6</TableCell>
-                <TableCell>Смолин С.Т.</TableCell>
-                <TableCell>М</TableCell>
-                <TableCell>22</TableCell>
-                <TableCell>Б14-505</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>ст701.1</TableCell>
-                <TableCell>Володин К.П.</TableCell>
-                <TableCell>М</TableCell>
-                <TableCell>22</TableCell>
-                <TableCell>Б14-701</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>ст701.2</TableCell>
-                <TableCell>Серов П.П.</TableCell>
-                <TableCell>М</TableCell>
-                <TableCell>21</TableCell>
-                <TableCell>Б14-701</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>ст701.3</TableCell>
-                <TableCell>Акишин М.Б.</TableCell>
-                <TableCell>М</TableCell>
-                <TableCell>21</TableCell>
-                <TableCell>Б14-701</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>ст701.4</TableCell>
-                <TableCell>Яшина Е.И.</TableCell>
-                <TableCell>М</TableCell>
-                <TableCell>22</TableCell>
-                <TableCell>Б14-701</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>ст701.8</TableCell>
-                <TableCell>Яшин Е.И.</TableCell>
-                <TableCell>М</TableCell>
-                <TableCell>22</TableCell>
-                <TableCell>Б14-701</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>ст901.1</TableCell>
-                <TableCell>Рогозина Г.Н.</TableCell>
-                <TableCell>Ж</TableCell>
-                <TableCell>20</TableCell>
-                <TableCell>Б14-901</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>ст901.2</TableCell>
-                <TableCell>Крымов Н.А.</TableCell>
-                <TableCell>М</TableCell>
-                <TableCell>19</TableCell>
-                <TableCell>Б14-901</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>ст901.3</TableCell>
-                <TableCell>Иванова В.И.</TableCell>
-                <TableCell>Ж</TableCell>
-                <TableCell>21</TableCell>
-                <TableCell>Б14-901</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>ст901.4</TableCell>
-                <TableCell>Громов Н.А.</TableCell>
-                <TableCell>М</TableCell>
-                <TableCell>19</TableCell>
-                <TableCell></TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>ст902.4</TableCell>
-                <TableCell>Трикова Л.В.</TableCell>
-                <TableCell>Ж</TableCell>
-                <TableCell>20</TableCell>
-                <TableCell></TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>ст903.1</TableCell>
-                <TableCell>Погудин О.В.</TableCell>
-                <TableCell>М</TableCell>
-                <TableCell>20</TableCell>
-                <TableCell>Б15-903</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>ст903.2</TableCell>
-                <TableCell>Погожин Д.И.</TableCell>
-                <TableCell>М</TableCell>
-                <TableCell>21</TableCell>
-                <TableCell>Б15-903</TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        ) : (
-          <></>
-        )}
+        {toggleResultTable &&
+          (!!executeSQLMutation.data ? (
+            <Table className="border">
+              <TableHeader>
+                <TableRow>
+                  {Object.keys(executeSQLMutation.data[0]).map(
+                    (key: string) => (
+                      <TableHead key={key}>{key}</TableHead>
+                    )
+                  )}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {executeSQLMutation.data.map((row: any) => (
+                  <TableRow key={row.id}>
+                    {Object.values(row).map((value) => (
+                      <TableCell key={value as any}>{value as any}</TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <p>Загрузка</p>
+          ))}
       </div>
     </div>
   );

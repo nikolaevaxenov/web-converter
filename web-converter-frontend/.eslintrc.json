@@ -6,8 +6,5 @@
       "files": ["*.ts", "*.tsx", "*.js"],
       "parser": "@typescript-eslint/parser"
     }
-  ],
-  "rules": {
-    "tailwindcss/no-custom-classname": "off"
-  }
+  ]
 }

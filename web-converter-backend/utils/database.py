@@ -5,7 +5,7 @@ import psycopg2.extras
 import os
 
 
-load_dotenv()
+load_dotenv(".env.local")
 
 
 conn = psycopg2.connect(dbname=os.getenv("DB_NAME"),
@@ -118,8 +118,7 @@ class DatabaseGeneric:
         with conn:
             with conn.cursor() as curs:
                 curs.execute('SELECT table_name FROM information_schema.tables WHERE table_schema=\'public\' AND table_type=\'BASE TABLE\' ORDER BY table_name;')
-                result = curs.fetchall()
-                return [name for row in result for name in row]
+                return curs.fetchall()
 
     @staticmethod
     def execute_sql(sql_query: str):

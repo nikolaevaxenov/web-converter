@@ -22,7 +22,7 @@ def execute_sql(sql_query_obj: query_model.SQLQuery):
         raise HTTPException(status_code=406, detail="Illegal SQL expression")
 
     try:
-        result = database.DatabaseGeneric.execute_sql(sql_query_obj.sql_query)
+        return database.DatabaseGeneric.execute_sql(sql_query_obj.sql_query)
     except psycopg2_errors.SyntaxError:
         raise HTTPException(status_code=406, detail="Invalid SQL expression")
 
