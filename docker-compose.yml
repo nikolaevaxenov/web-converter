@@ -1,0 +1,31 @@
+version: "3.9"
+
+services:
+  database:
+    image: postgres
+    restart: unless-stopped
+    shm_size: 128mb
+    environment:
+      POSTGRES_DB: students
+      POSTGRES_PASSWORD: password
+    volumes:
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+  adminer:
+    image: adminer
+    restart: unless-stopped
+    ports:
+      - 8888:8080
+  backend:
+    build: web-converter-backend/
+    restart: unless-stopped
+    ports:
+      - 8000:8000
+    depends_on:
+      - database
+  frontend:
+    build: web-converter-frontend/
+    restart: unless-stopped
+    ports:
+      - 3000:3000
+    depends_on:
+      - backend

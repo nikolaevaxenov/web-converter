@@ -5,7 +5,10 @@ import psycopg2.extras
 import os
 
 
-load_dotenv(".env.local")
+if (os.path.isfile(".env.local")):
+    load_dotenv(".env.local")
+else:
+    load_dotenv(".env.production")
 
 
 conn = psycopg2.connect(dbname=os.getenv("DB_NAME"),

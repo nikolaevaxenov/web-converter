@@ -1,0 +1,11 @@
+Dockerfile
+.dockerignore
+README.md
+.git
+**/__pycache__
+.venv
+.env.sample
+.env.local
+.gitignore
+poetry.lock
+pyproject.toml
