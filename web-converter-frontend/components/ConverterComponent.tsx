@@ -10,6 +10,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -49,6 +59,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { SubmitHandler, useForm } from "react-hook-form";
+import { useHotkeys } from "react-hotkeys-hook";
 import { useMutation, useQuery } from "react-query";
 
 export default function ConverterComponent({
@@ -68,6 +79,7 @@ export default function ConverterComponent({
   const [toggleResultTable, setToggleResultTable] = useState(false);
   const [selectedQuery, setSelectedQuery] = useState(0);
   const [applyQuery, setApplyQuery] = useState(false);
+  const [deleteQueryDialogOpen, setDeleteQueryDialogOpen] = useState(false);
   const { toast } = useToast();
 
   const {
@@ -222,6 +234,65 @@ export default function ConverterComponent({
   }, [selectedQuery]);
 
   const letterGenerator = generateLetter();
+
+  const onApplyButtonClick = () => {
+    selectedQuery === 0
+      ? toast({
+          title: "Ошибка",
+          description: "Для применения запроса необходимо его выбрать!",
+        })
+      : Object.entries(getQueryByIdData.data).forEach(([name, value]: any) =>
+          setValue(name, value)
+        );
+  };
+  const onApplyCancelButtonClick = () => {
+    setSelectedQuery(0);
+    reset();
+  };
+  const onApplyClearFieldsButtonClick = () => {
+    reset();
+  };
+  const onSaveButtonClick = () => {
+    setApplyQuery(false);
+    handleSubmit(onSaveQuerySubmit)();
+  };
+  const onEditButtonClick = () => {
+    setApplyQuery(false);
+    handleSubmit(onEditQuerySubmit)();
+  };
+  const onDeleteButtonClick = () => {
+    setDeleteQueryDialogOpen(true);
+  };
+  const onGenerateSQLButtonClick = () => {
+    setApplyQuery(true);
+    handleSubmit(onConvertQuerySubmit)();
+  };
+  const onRefreshSQLButtonClick = () => {
+    sqlQueryForm.handleSubmit(onExecuteSQLSubmit)();
+  };
+  const onCloseTableButtonClick = () => {
+    setToggleResultTable(false);
+  };
+  const onExecuteSQLButtonClick = () => {
+    sqlQueryForm.handleSubmit(onExecuteSQLSubmit)();
+  };
+  const onCreateViewButtonClick = () => {
+    sqlQueryForm.handleSubmit(onCreateViewSubmit)();
+  };
+
+  const hotkeysOptions = {
+    enableOnFormTags: true,
+  };
+  useHotkeys("ctrl+alt+a", onApplyButtonClick, hotkeysOptions);
+  useHotkeys("ctrl+alt+c", onApplyClearFieldsButtonClick, hotkeysOptions);
+  useHotkeys("ctrl+alt+s", onSaveButtonClick, hotkeysOptions);
+  useHotkeys("ctrl+alt+e", onEditButtonClick, hotkeysOptions);
+  useHotkeys("ctrl+alt+d", onDeleteButtonClick, hotkeysOptions);
+  useHotkeys("ctrl+alt+g", onGenerateSQLButtonClick, hotkeysOptions);
+  useHotkeys("ctrl+alt+r", onRefreshSQLButtonClick, hotkeysOptions);
+  useHotkeys("ctrl+alt+t", onCloseTableButtonClick, hotkeysOptions);
+  useHotkeys("ctrl+alt+x", onExecuteSQLButtonClick, hotkeysOptions);
+  useHotkeys("ctrl+alt+v", onCreateViewButtonClick, hotkeysOptions);
 
   return (
     <div className="flex flex-col gap-5">
@@ -427,81 +498,39 @@ export default function ConverterComponent({
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1.5">
             {selectedQuery === 0 ? (
-              <Button
-                className="flex grow"
-                onClick={() => {
-                  selectedQuery === 0
-                    ? toast({
-                        title: "Ошибка",
-                        description:
-                          "Для применения запроса необходимо его выбрать!",
-                      })
-                    : Object.entries(getQueryByIdData.data).forEach(
-                        ([name, value]: any) => setValue(name, value)
-                      );
-                }}
-              >
+              <Button className="flex grow" onClick={onApplyButtonClick}>
                 <Check className="mr-2" /> Принять запрос
               </Button>
             ) : (
               <>
-                <Button
-                  onClick={() => {
-                    selectedQuery === 0
-                      ? toast({
-                          title: "Ошибка",
-                          description:
-                            "Для применения запроса необходимо его выбрать!",
-                        })
-                      : Object.entries(getQueryByIdData.data).forEach(
-                          ([name, value]: any) => setValue(name, value)
-                        );
-                  }}
-                >
+                <Button onClick={onApplyButtonClick}>
                   <Check className="mr-2" /> Принять запрос
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setSelectedQuery(0);
-                    reset();
-                  }}
-                >
+                <Button variant="outline" onClick={onApplyCancelButtonClick}>
                   <X className="mr-2" /> Отменить выбор
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={() => {
-                    reset();
-                  }}
+                  onClick={onApplyClearFieldsButtonClick}
                 >
                   <Trash2 className="mr-2" /> Очистить поля
                 </Button>
               </>
             )}
           </div>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setApplyQuery(false);
-              handleSubmit(onSaveQuerySubmit)();
-            }}
-          >
+          <Button variant="secondary" onClick={onSaveButtonClick}>
             <Save className="mr-2" />
             {selectedQuery === 0
               ? "Сохранить запрос"
               : "Сохранить копию запроса"}
           </Button>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setApplyQuery(false);
-              handleSubmit(onEditQuerySubmit)();
-            }}
-          >
+          <Button variant="secondary" onClick={onEditButtonClick}>
             <Pen className="mr-2" /> Изменить запрос
           </Button>
-          <Dialog>
+          <Dialog
+            open={deleteQueryDialogOpen}
+            onOpenChange={setDeleteQueryDialogOpen}
+          >
             <DialogTrigger asChild>
               <Button variant="destructive">
                 <Trash2 className="mr-2" /> Удалить запрос
@@ -539,12 +568,7 @@ export default function ConverterComponent({
             </DialogContent>
           </Dialog>
           <Separator />
-          <Button
-            onClick={() => {
-              setApplyQuery(true);
-              handleSubmit(onConvertQuerySubmit)();
-            }}
-          >
+          <Button onClick={onGenerateSQLButtonClick}>
             <Plus className="mr-2" /> Генерировать SQL
           </Button>
           <div className="flex flex-row gap-1.5">
@@ -553,33 +577,107 @@ export default function ConverterComponent({
                 <Button
                   className="flex grow"
                   variant="secondary"
-                  onClick={sqlQueryForm.handleSubmit(onExecuteSQLSubmit)}
+                  onClick={onRefreshSQLButtonClick}
                 >
                   <RefreshCcw className="mr-2" /> Обновить
                 </Button>
-                <Button
-                  variant="destructive"
-                  onClick={() => setToggleResultTable(false)}
-                >
+                <Button variant="destructive" onClick={onCloseTableButtonClick}>
                   <X />
                 </Button>
               </>
             ) : (
-              <Button
-                className="flex grow"
-                onClick={sqlQueryForm.handleSubmit(onExecuteSQLSubmit)}
-              >
+              <Button className="flex grow" onClick={onExecuteSQLButtonClick}>
                 <SendHorizontal className="mr-2" /> Выполнить SQL
               </Button>
             )}
           </div>
           <Separator />
-          <Button
-            variant="secondary"
-            onClick={sqlQueryForm.handleSubmit(onCreateViewSubmit)}
-          >
+          <Button variant="secondary" onClick={onCreateViewButtonClick}>
             <Save className="mr-2" /> Создать View
           </Button>
+          <Separator />
+          <Drawer>
+            <DrawerTrigger asChild>
+              <Button variant="secondary">
+                <Save className="mr-2" /> Список сочетаний клавиш
+              </Button>
+            </DrawerTrigger>
+            <DrawerContent>
+              <DrawerHeader>
+                <DrawerTitle className="text-center text-lg">
+                  Сочетания клавиш
+                </DrawerTitle>
+                <DrawerDescription>
+                  <div className="grid grid-cols-2 justify-items-center gap-x-8">
+                    <p className="justify-self-end text-lg font-bold text-slate-950">
+                      CTRL+ALT+A
+                    </p>
+                    <p className="justify-self-start text-lg">Принять запрос</p>
+
+                    <p className="justify-self-end text-lg font-bold text-slate-950">
+                      CTRL+ALT+C
+                    </p>
+                    <p className="justify-self-start text-lg">Очистить поля</p>
+
+                    <p className="justify-self-end text-lg font-bold text-slate-950">
+                      CTRL+ALT+S
+                    </p>
+                    <p className="justify-self-start text-lg">
+                      Сохранить запрос
+                    </p>
+
+                    <p className="justify-self-end text-lg font-bold text-slate-950">
+                      CTRL+ALT+E
+                    </p>
+                    <p className="justify-self-start text-lg">
+                      Изменить запрос
+                    </p>
+
+                    <p className="justify-self-end text-lg font-bold text-slate-950">
+                      CTRL+ALT+D
+                    </p>
+                    <p className="justify-self-start text-lg">Удалить запрос</p>
+
+                    <p className="justify-self-end text-lg font-bold text-slate-950">
+                      CTRL+ALT+G
+                    </p>
+                    <p className="justify-self-start text-lg">
+                      Генерировать SQL
+                    </p>
+
+                    <p className="justify-self-end text-lg font-bold text-slate-950">
+                      CTRL+ALT+X
+                    </p>
+                    <p className="justify-self-start text-lg">Выполнить SQL</p>
+
+                    <p className="justify-self-end text-lg font-bold text-slate-950">
+                      CTRL+ALT+R
+                    </p>
+                    <p className="justify-self-start text-lg">
+                      Обновить таблицу вывода
+                    </p>
+
+                    <p className="justify-self-end text-lg font-bold text-slate-950">
+                      CTRL+ALT+T
+                    </p>
+                    <p className="justify-self-start text-lg">
+                      Закрыть таблицу вывода
+                    </p>
+
+                    <p className="justify-self-end text-lg font-bold text-slate-950">
+                      CTRL+ALT+V
+                    </p>
+                    <p className="justify-self-start text-lg">Создать View</p>
+                  </div>
+                </DrawerDescription>
+              </DrawerHeader>
+              <DrawerFooter>
+                <DrawerClose>
+                  <Button variant="outline">Закрыть</Button>
+                </DrawerClose>
+              </DrawerFooter>
+            </DrawerContent>
+          </Drawer>
         </div>
       </div>
       <div className="flex flex-row justify-center" id="result-table">

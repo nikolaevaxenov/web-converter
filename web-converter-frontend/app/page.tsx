@@ -16,6 +16,15 @@ export default function Home() {
           <ConverterComponent converterType="tuple" />
         </TabsContent>
       </Tabs>
+      <div className="flex flex-row justify-center gap-3">
+        <a
+          href="https://github.com/nikolaevaxenov"
+          target="_blank"
+          className="text-sm font-semibold text-slate-800 underline decoration-sky-300 decoration-2 underline-offset-2 hover:text-slate-600 hover:decoration-wavy"
+        >
+          Nikolaev-Axenov, 2024
+        </a>
+      </div>
     </div>
   );
 }
