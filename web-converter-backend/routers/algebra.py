@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from models import query_model
-from utils import database
+from utils import database, converter
 
 
 router = APIRouter(prefix="/algebra", tags=['algebra'])
@@ -49,3 +49,8 @@ def delete_query_by_id(query_id: int):
     if not result:
         raise HTTPException(status_code=404, detail=f"Query with ID = {query_id} not found")
     return result
+
+
+@router.post("/convert")
+def convert_query(query: query_model.ConvertQuery):
+    return converter.convert_query_algebra(database.getConn(), query)

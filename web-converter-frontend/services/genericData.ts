@@ -23,6 +23,10 @@ export const executeSQL = async (sqlQuery: SQLQuery) => {
     }
   );
 
+  if (!response.ok) {
+    throw new Error(`${response.status} ${response.statusText}`);
+  }
+
   return response.json();
 };
 

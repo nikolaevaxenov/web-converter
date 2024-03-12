@@ -29,7 +29,13 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { createView, executeSQL, getAllTables } from "@/services/genericData";
-import { Query, QueryName, SQLQuery, TableName } from "@/types/Query";
+import {
+  ConvertQuery,
+  Query,
+  QueryName,
+  SQLQuery,
+  TableName,
+} from "@/types/Query";
 import { emptyQueryStringsToNull, generateLetter } from "@/utils/tools";
 import {
   Check,
@@ -56,10 +62,12 @@ export default function ConverterComponent({
     editQuery,
     getAllQueriesNames,
     getQueryById,
+    convertQuery,
   } = require(`@/services/${converterType}Data`);
 
   const [toggleResultTable, setToggleResultTable] = useState(false);
   const [selectedQuery, setSelectedQuery] = useState(0);
+  const [applyQuery, setApplyQuery] = useState(false);
   const { toast } = useToast();
 
   const {
@@ -68,6 +76,8 @@ export default function ConverterComponent({
     reset,
     setValue,
     getValues,
+    setError,
+    clearErrors,
     formState: { errors },
   } = useForm<Query>();
   const sqlQueryForm = useForm<SQLQuery>();
@@ -114,9 +124,34 @@ export default function ConverterComponent({
       });
     },
   });
+  const convertQueryMutation = useMutation({
+    mutationFn: (data: ConvertQuery) => convertQuery(data),
+    onSuccess: (data: string) => {
+      clearErrors("query_body");
+      sqlQueryForm.setValue("sql_query", data);
+      toast({
+        title: "Успех",
+        description: "SQL запрос успешно конвертирован!",
+      });
+    },
+    onError() {
+      setError("query_body", {
+        type: "generate",
+        message: "conversion error",
+      });
+    },
+  });
   const executeSQLMutation = useMutation(executeSQL, {
     onSuccess: () => {
+      sqlQueryForm.clearErrors("sql_query");
       setToggleResultTable(true);
+    },
+    onError(error) {
+      console.log(error);
+      sqlQueryForm.setError("sql_query", {
+        type: "execute",
+        message: "Execution error",
+      });
     },
   });
   const createViewMutation = useMutation(createView, {
@@ -142,6 +177,13 @@ export default function ConverterComponent({
       emptyQueryStringsToNull(data);
       editQueryMutation.mutate({ queryId: selectedQuery, query: data });
     }
+  };
+  const onConvertQuerySubmit: SubmitHandler<Query> = (data) => {
+    convertQueryMutation.mutate({
+      table_variables: data.table_variables,
+      target_list: data.target_list,
+      query_body: data.query_body,
+    });
   };
   const onExecuteSQLSubmit: SubmitHandler<SQLQuery> = (data) => {
     executeSQLMutation.mutate({
@@ -299,8 +341,18 @@ export default function ConverterComponent({
                 <Textarea
                   className="resize-none"
                   id="variable-types"
-                  {...register("table_variables")}
+                  {...register("table_variables", {
+                    validate: (value) => {
+                      if (!applyQuery) return true;
+                      return value !== "";
+                    },
+                  })}
                 />
+                {errors.table_variables && (
+                  <div className="text-center text-sm text-red-700">
+                    Это поле обязательно!
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex flex-col gap-1.5">
@@ -308,8 +360,18 @@ export default function ConverterComponent({
               <Input
                 id="target-list"
                 type="text"
-                {...register("target_list")}
+                {...register("target_list", {
+                  validate: (value) => {
+                    if (!applyQuery) return true;
+                    return value !== "";
+                  },
+                })}
               />
+              {errors.target_list && (
+                <div className="text-center text-sm text-red-700">
+                  Это поле обязательно!
+                </div>
+              )}
             </div>
             <div className="flex grow flex-col gap-5 lg:flex-row">
               <div className="flex w-full flex-col gap-1.5">
@@ -317,8 +379,24 @@ export default function ConverterComponent({
                 <Textarea
                   className="grow resize-none"
                   id="input-query"
-                  {...register("query_body")}
+                  {...register("query_body", {
+                    validate: (value) => {
+                      if (!applyQuery) return true;
+                      return value !== "";
+                    },
+                  })}
                 />
+                {errors.query_body?.type === "validate" && (
+                  <div className="text-center text-sm text-red-700">
+                    Это поле обязательно!
+                  </div>
+                )}
+                {errors.query_body?.type === "generate" && (
+                  <div className="text-center text-sm text-red-700">
+                    Невозможно преобразовать выражение. Выражение содержит
+                    ошибки!
+                  </div>
+                )}
               </div>
               <div className="flex w-full flex-col gap-1.5">
                 <Label htmlFor="output-query">SQL-выражение:</Label>
@@ -330,9 +408,16 @@ export default function ConverterComponent({
                     minLength: 1,
                   })}
                 />
-                {sqlQueryForm.formState.errors.sql_query && (
+                {sqlQueryForm.formState.errors.sql_query?.type ===
+                  "required" && (
                   <div className="text-center text-sm text-red-700">
                     Это поле обязательно!
+                  </div>
+                )}
+                {sqlQueryForm.formState.errors.sql_query?.type ===
+                  "execute" && (
+                  <div className="text-center text-sm text-red-700">
+                    Неверный SQL-запрос!
                   </div>
                 )}
               </div>
@@ -395,13 +480,25 @@ export default function ConverterComponent({
               </>
             )}
           </div>
-          <Button variant="secondary" onClick={handleSubmit(onSaveQuerySubmit)}>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setApplyQuery(false);
+              handleSubmit(onSaveQuerySubmit)();
+            }}
+          >
             <Save className="mr-2" />
             {selectedQuery === 0
               ? "Сохранить запрос"
               : "Сохранить копию запроса"}
           </Button>
-          <Button variant="secondary" onClick={handleSubmit(onEditQuerySubmit)}>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setApplyQuery(false);
+              handleSubmit(onEditQuerySubmit)();
+            }}
+          >
             <Pen className="mr-2" /> Изменить запрос
           </Button>
           <Dialog>
@@ -442,7 +539,12 @@ export default function ConverterComponent({
             </DialogContent>
           </Dialog>
           <Separator />
-          <Button>
+          <Button
+            onClick={() => {
+              setApplyQuery(true);
+              handleSubmit(onConvertQuerySubmit)();
+            }}
+          >
             <Plus className="mr-2" /> Генерировать SQL
           </Button>
           <div className="flex flex-row gap-1.5">
@@ -480,29 +582,35 @@ export default function ConverterComponent({
           </Button>
         </div>
       </div>
-      <div className="flex flex-row" id="result-table">
+      <div className="flex flex-row justify-center" id="result-table">
         {toggleResultTable &&
           (!!executeSQLMutation.data ? (
-            <Table className="border">
-              <TableHeader>
-                <TableRow>
-                  {Object.keys(executeSQLMutation.data[0]).map(
-                    (key: string) => (
-                      <TableHead key={key}>{key}</TableHead>
-                    )
-                  )}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {executeSQLMutation.data.map((row: any) => (
-                  <TableRow key={row.id}>
-                    {Object.values(row).map((value) => (
-                      <TableCell key={value as any}>{value as any}</TableCell>
-                    ))}
+            !executeSQLMutation.data.length ? (
+              <p className="text-lg font-bold lg:text-2xl">
+                Результат на SQL-запрос пуст!
+              </p>
+            ) : (
+              <Table className="border">
+                <TableHeader>
+                  <TableRow>
+                    {Object.keys(executeSQLMutation.data[0]).map(
+                      (key: string) => (
+                        <TableHead key={key}>{key}</TableHead>
+                      )
+                    )}
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {executeSQLMutation.data.map((row: any) => (
+                    <TableRow key={row.id}>
+                      {Object.values(row).map((value) => (
+                        <TableCell key={value as any}>{value as any}</TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )
           ) : (
             <p>Загрузка</p>
           ))}

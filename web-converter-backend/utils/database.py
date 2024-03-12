@@ -19,6 +19,10 @@ conn = psycopg2.connect(dbname=os.getenv("DB_NAME"),
 conn.set_client_encoding('UTF8')
 
 
+def getConn():
+    return conn
+
+
 class DatabaseAlgebra:
     @staticmethod
     def get_all_queries():

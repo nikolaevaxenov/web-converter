@@ -15,6 +15,12 @@ export type QueryName = {
   query_id: string;
 };
 
+export type ConvertQuery = {
+  table_variables: string | null;
+  target_list: string | null;
+  query_body: string | null;
+};
+
 export type TableName = {
   table_name: string;
 };

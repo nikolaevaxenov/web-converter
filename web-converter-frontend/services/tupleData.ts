@@ -1,4 +1,4 @@
-import { Query } from "@/types/Query";
+import { ConvertQuery, Query } from "@/types/Query";
 
 export const getAllQueries = async () => {
   const response = await fetch(
@@ -74,6 +74,21 @@ export const deleteQuery = async (queryId: number) => {
     `${process.env.NEXT_PUBLIC_BACKEND_URL}/tuple/${queryId}`,
     {
       method: "DELETE",
+    }
+  );
+
+  return response.json();
+};
+
+export const convertQuery = async (query: ConvertQuery) => {
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_BACKEND_URL}/tuple/convert`,
+    {
+      method: "POST",
+      headers: {
+        "Content-type": "application/json",
+      },
+      body: JSON.stringify(query),
     }
   );
 
