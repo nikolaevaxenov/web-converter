@@ -1,9 +1,10 @@
 from models import query_model
 from utils import converter_funcs
+import re
 
 
 def convert_query_algebra(conn, query: query_model.ConvertQuery):
-    print(query.query_body)
+    query.query_body = re.sub(r"\s+", " ", query.query_body)
 
     oTV = converter_funcs.TableVariables(query.table_variables)
     aTV_ASS = oTV.get_table_variables("ASS")
@@ -22,7 +23,7 @@ def convert_query_algebra(conn, query: query_model.ConvertQuery):
     if aGL_ATR[0] == "*":
         query.target_list = ""
         wTBL = aTV_ASS[aGL_VAR[0]]
-        sql = "SHOW COLUMNS FROM " + wTBL
+        sql = f"SELECT column_name FROM information_schema.columns WHERE table_name = '{wTBL}';"
         with conn:
             with conn.cursor() as curs:
                 curs.execute(sql)
@@ -73,7 +74,10 @@ def convert_query_algebra(conn, query: query_model.ConvertQuery):
             if i < qb_qty_1 - 1:
                 TableVar_1 += aTV_ALL[converter_funcs.qb_02(wQ1, 2)[i]] + ","
             else:
-                TableVar_1 += aTV_ALL[converter_funcs.qb_02(wQ1, 2)[i]]
+                try:
+                    TableVar_1 += aTV_ALL[converter_funcs.qb_02(wQ1, 2)[i]]
+                except IndexError:
+                    pass
         
         sqlW = converter_funcs.sql_1(wQ0, TableVar_0, GoalList_0) + "\n" + wQ2 + "\n" + converter_funcs.sql_1(wQ1_2, TableVar_1, GoalList_1)
 
@@ -138,7 +142,7 @@ def convert_query_tuple(conn, query: query_model.ConvertQuery):
     if target_list_attributes[0] == "*":
         query.target_list = ""
         table_name = table_variables_associations[target_list_variables[0]]
-        sql = "SHOW COLUMNS FROM " + table_name
+        sql = f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table_name}';"
         with conn:
             with conn.cursor() as curs:
                 curs.execute(sql)

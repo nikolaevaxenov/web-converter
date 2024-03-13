@@ -16,12 +16,18 @@ class TableVariables:
 
         if type == "ALL":
             for table_variable in table_variables_list:
-                self.full_string_associations[table_variable.split(" ")[2]] = table_variable
+                if table_variable == "":
+                    self.full_string_associations[""] = table_variable
+                else:
+                    self.full_string_associations[table_variable.split(" ")[2]] = table_variable
             return self.full_string_associations
 
         if type == "IND":
             for count, table_variable in enumerate(table_variables_list):
-                self.variables.append(self.table_variables.split(",")[count][-1])
+                if self.table_variables.split(",")[count] == "":
+                    self.variables.append("")
+                else:
+                    self.variables.append(self.table_variables.split(",")[count][-1])
             return self.variables
 
 
@@ -81,6 +87,7 @@ class QueryBody:
 
             if self.query_body.upper().find(a[2]) != -1:
                 self.qwb = self.query_body.split(a[2])
+                self.qwb.append(" UNION ")
 
             if self.query_body.upper().find(a[3]) != -1:
                 self.qwb = self.query_body.split(a[3])
@@ -131,6 +138,31 @@ def qby(tv, gl):
     return q
 
 
+def qbx(qb):
+    m_qb1 = qb.split("[")
+    m_qb2 = []
+    m_qb3 = []
+    
+    j = 0
+    for x in m_qb1:
+        if x.find("]") != -1:
+            m_qb2.append(x.split("]")[0])
+            j += 1
+
+    j = 0
+    for x1 in m_qb2:
+        if x1.find(" AND ") == -1:
+            m_qb3.append(x1)
+            j += 1
+        else:
+            t = x1.split(" AND ")
+            for x2 in t:
+                m_qb3.append(x2)
+                j += 1
+    
+    return m_qb3
+
+
 def qb_01(qb, gl, x):
     aGL_VAR = TargetList(gl).get_target_list("VAR")
 
@@ -151,6 +183,7 @@ def qb_01(qb, gl, x):
             else:
                 m_qb2.append(m_qb0.split("]")[1])
 
+    m_qb2 = list(filter(None, m_qb2))
     m_qb1 = list(set(m_qb2, aGL_VAR))[:qb_qty]
 
     if x == 1:
@@ -174,9 +207,10 @@ def qb_02(qb, x):
         if i == 0:
             m_qb2.append(m_qb0[i])
         else:
-            if len(m_qb0[i].split("]")) > 0:
-                m_qb2.append(m_qb0[i].split("]")[0])
-            
+            m_qb2.append(m_qb0[i].split("]")[1])
+
+    m_qb2 = list(filter(None, m_qb2))
+
     aGL_VAR = TargetList(s_qb0).get_target_list("VAR")
     m_qb1 = list(set(m_qb2) - set(aGL_VAR))[:qb_qty]
 
@@ -191,15 +225,15 @@ def qb_02(qb, x):
     
 
 def sql_1(qb, tv, gl):
-    aQB_QBX = QueryBody(qb).get_query_body("QBX")
     aTV_ALL = TableVariables(tv).get_table_variables("ALL")
-    aGL_VAR = TargetList(gl).get_target_list("VAR")
     w1 = qby(tv, gl)
+    w2 = TargetList(gl).get_target_list("VAR")
+    w3 = qbx(qb)
 
     tvQty = tv.count(",") + 1
-    glQty = len(aGL_VAR)
+    glQty = len(w2)
     qbQty = tvQty - glQty
-    prQty = len(aQB_QBX)
+    prQty = len(qbx(qb))
     
     QuerySQL = "SELECT " + gl + "\n FROM "
     
@@ -209,23 +243,23 @@ def sql_1(qb, tv, gl):
 
     for i in range(glQty):
         if i < glQty - 1:
-            QuerySQL += aTV_ALL[aGL_VAR[i]] + ", "
+            QuerySQL += aTV_ALL[w2[i]] + ", "
         else:
-            QuerySQL += aTV_ALL[aGL_VAR[i]]
+            QuerySQL += aTV_ALL[w2[i]]
 
     QuerySQL += "\n WHERE "
 
     if not w1:
-        if aQB_QBX[prQty - 1].find(",") == -1:
+        if w3[prQty - 1].find(",") == -1:
             wprQty = prQty - 1
         else:
             wprQty = prQty - 2
         
         for i in range(wprQty + 1):
             if i < wprQty:
-                QuerySQL += aQB_QBX[i] + " AND "
+                QuerySQL += w3[i] + " AND "
             else:
-                QuerySQL += aQB_QBX[i]
+                QuerySQL += w3[i]
 
         return QuerySQL
     else:
@@ -234,7 +268,7 @@ def sql_1(qb, tv, gl):
         M1 = []
         M2 = []
 
-        for x in aQB_QBX:
+        for x in w3:
             for i in range(qbQty):
                 if x.find(w1[i]) != -1 and x not in M2:
                     M2.append(x)
@@ -261,7 +295,7 @@ def sql_1(qb, tv, gl):
             
             return QuerySQL
         
-        for x in list(set(aQB_QBX) - set(M2)):
+        for x in list(set(w3) - set(M2)):
             M1.append(x)
             k += 1
         
