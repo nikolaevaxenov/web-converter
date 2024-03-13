@@ -1,10 +1,25 @@
-import { SQLQuery, SQLView } from "@/types/Query";
+import { SQLQuery, SQLView, TableNames } from "@/types/Query";
 
 export const getAllTables = async () => {
   const response = await fetch(
     `${process.env.NEXT_PUBLIC_BACKEND_URL}/generic/`,
     {
       method: "GET",
+    }
+  );
+
+  return response.json();
+};
+
+export const getAllColumns = async (table: TableNames) => {
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_BACKEND_URL}/generic/columns`,
+    {
+      method: "POST",
+      headers: {
+        "Content-type": "application/json",
+      },
+      body: JSON.stringify(table),
     }
   );
 

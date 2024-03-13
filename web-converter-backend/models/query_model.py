@@ -27,6 +27,10 @@ class ConvertQuery(BaseModel):
     query_body: str = Field(min_length=1)
 
 
+class GetColumnsNames(BaseModel):
+    table_names: list[str] = Field(min_length=1)
+
+
 class SQLQuery(BaseModel):
     sql_query: str = Field(min_length=1)
 

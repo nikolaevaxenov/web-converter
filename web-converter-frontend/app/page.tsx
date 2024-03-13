@@ -16,7 +16,7 @@ export default function Home() {
           <ConverterComponent converterType="tuple" />
         </TabsContent>
       </Tabs>
-      <div className="flex flex-row justify-center gap-3">
+      <div className="flex flex-row justify-center gap-3 mt-5">
         <a
           href="https://github.com/nikolaevaxenov"
           target="_blank"

@@ -27,6 +27,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import {
   Table,
@@ -38,7 +39,12 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
-import { createView, executeSQL, getAllTables } from "@/services/genericData";
+import {
+  createView,
+  executeSQL,
+  getAllColumns,
+  getAllTables,
+} from "@/services/genericData";
 import {
   ConvertQuery,
   Query,
@@ -78,6 +84,7 @@ export default function ConverterComponent({
 
   const [toggleResultTable, setToggleResultTable] = useState(false);
   const [selectedQuery, setSelectedQuery] = useState(0);
+  const [selectedTables, setSelectedTables] = useState<string[]>([""]);
   const [applyQuery, setApplyQuery] = useState(false);
   const [deleteQueryDialogOpen, setDeleteQueryDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -90,9 +97,12 @@ export default function ConverterComponent({
     getValues,
     setError,
     clearErrors,
+    watch,
     formState: { errors },
   } = useForm<Query>();
   const sqlQueryForm = useForm<SQLQuery>();
+
+  const watchTableVariables = watch("table_variables");
 
   const getAllQueriesNamesData = useQuery<QueryName[]>(
     "getAllQueriesNames",
@@ -113,6 +123,11 @@ export default function ConverterComponent({
     }
   );
   const getAllTablesData = useQuery("getAllTables", getAllTables);
+  const getAllColumnsData = useQuery(
+    ["getAllColumns", selectedTables],
+    () => getAllColumns({ table_names: selectedTables }),
+    { enabled: false }
+  );
 
   const addQueryMutation = useMutation({
     mutationFn: (data: Query) => addQuery(data),
@@ -232,6 +247,31 @@ export default function ConverterComponent({
   useEffect(() => {
     getQueryByIdData.refetch();
   }, [selectedQuery]);
+
+  useEffect(() => {
+    if (watchTableVariables) {
+      const tables = watchTableVariables
+        .replaceAll(", ", ",")
+        .split(",")
+        .map((row) => row.split(" ")[0]);
+
+      setSelectedTables(Array.from(new Set(tables)));
+    } else {
+      setSelectedTables([""]);
+    }
+
+    console.log(selectedTables);
+  }, [watchTableVariables]);
+
+  useEffect(() => {
+    if (selectedTables.length !== 0) {
+      getAllColumnsData.refetch();
+    }
+  }, [selectedTables]);
+
+  useEffect(() => {
+    console.log(getAllColumnsData.data);
+  }, [getAllColumnsData.data]);
 
   const letterGenerator = generateLetter();
 
@@ -372,29 +412,33 @@ export default function ConverterComponent({
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-80">
-                      <div className="flex flex-col gap-1.5">
-                        {getAllTablesData.data.map((row: TableName) => (
-                          <Button
-                            key={row.table_name}
-                            variant="outline"
-                            onClick={() =>
-                              getValues("table_variables") === ""
-                                ? setValue(
-                                    "table_variables",
-                                    `${row.table_name} AS ${letterGenerator()}`
-                                  )
-                                : setValue(
-                                    "table_variables",
-                                    `${getValues("table_variables")}, ${
-                                      row.table_name
-                                    } AS ${letterGenerator()}`
-                                  )
-                            }
-                          >
-                            <Plus className="mr-1" /> {row.table_name}
-                          </Button>
-                        ))}
-                      </div>
+                      <ScrollArea className="h-80 px-4 py-1">
+                        <div className="flex flex-col gap-1.5">
+                          {getAllTablesData.data.map((row: TableName) => (
+                            <Button
+                              key={row.table_name}
+                              variant="outline"
+                              onClick={() =>
+                                getValues("table_variables") === ""
+                                  ? setValue(
+                                      "table_variables",
+                                      `${
+                                        row.table_name
+                                      } AS ${letterGenerator()}`
+                                    )
+                                  : setValue(
+                                      "table_variables",
+                                      `${getValues("table_variables")}, ${
+                                        row.table_name
+                                      } AS ${letterGenerator()}`
+                                    )
+                              }
+                            >
+                              <Plus className="mr-1" /> {row.table_name}
+                            </Button>
+                          ))}
+                        </div>
+                      </ScrollArea>
                     </PopoverContent>
                   </Popover>
                 ) : (
@@ -427,7 +471,57 @@ export default function ConverterComponent({
               </div>
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="target-list">Целевой список:</Label>
+              <div className="flex flex-row justify-between">
+                <Label className="self-end" htmlFor="target-list">
+                  Целевой список:
+                </Label>
+                {!!getAllColumnsData.data &&
+                  !getAllColumnsData.data.hasOwnProperty("") && (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" title="Добавить переменную">
+                          <Plus />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-80">
+                        <ScrollArea className="h-80 px-4 py-1">
+                          <div className="flex flex-col gap-1.5">
+                            {watchTableVariables
+                              ?.replaceAll(", ", ",")
+                              .split(",")
+                              .map((row) => row.split(" "))
+                              .map((name) =>
+                                getAllColumnsData.data[name[0]]?.map(
+                                  (column: string) => (
+                                    <Button
+                                      key={`${name[0]}${name[2]}${column}`}
+                                      variant="outline"
+                                      onClick={() =>
+                                        getValues("target_list") === ""
+                                          ? setValue(
+                                              "target_list",
+                                              `${name[2]}.${column}`
+                                            )
+                                          : setValue(
+                                              "target_list",
+                                              `${getValues("target_list")}, ${
+                                                name[2]
+                                              }.${column}`
+                                            )
+                                      }
+                                    >
+                                      <Plus className="mr-1" />
+                                      {`${name[2]}.${column}`}
+                                    </Button>
+                                  )
+                                )
+                              )}
+                          </div>
+                        </ScrollArea>
+                      </PopoverContent>
+                    </Popover>
+                  )}
+              </div>
               <Input
                 id="target-list"
                 type="text"
@@ -446,7 +540,57 @@ export default function ConverterComponent({
             </div>
             <div className="flex grow flex-col gap-5 lg:flex-row">
               <div className="flex w-full flex-col gap-1.5">
-                <Label htmlFor="input-query">Выражение:</Label>
+                <div className="flex flex-row justify-between">
+                  <Label className="self-end" htmlFor="input-query">
+                    Выражение:
+                  </Label>
+                  {!!getAllColumnsData.data &&
+                    !getAllColumnsData.data.hasOwnProperty("") && (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" title="Добавить переменную">
+                            <Plus />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80">
+                          <ScrollArea className="h-80 px-4 py-1">
+                            <div className="flex flex-col gap-1.5">
+                              {watchTableVariables
+                                ?.replaceAll(", ", ",")
+                                .split(",")
+                                .map((row) => row.split(" "))
+                                .map((name) =>
+                                  getAllColumnsData.data[name[0]]?.map(
+                                    (column: string) => (
+                                      <Button
+                                        key={`${name[0]}${name[2]}${column}`}
+                                        variant="outline"
+                                        onClick={() =>
+                                          getValues("query_body") === ""
+                                            ? setValue(
+                                                "query_body",
+                                                `${name[2]}.${column}`
+                                              )
+                                            : setValue(
+                                                "query_body",
+                                                `${getValues("query_body")}${
+                                                  name[2]
+                                                }.${column}`
+                                              )
+                                        }
+                                      >
+                                        <Plus className="mr-1" />
+                                        {`${name[2]}.${column}`}
+                                      </Button>
+                                    )
+                                  )
+                                )}
+                            </div>
+                          </ScrollArea>
+                        </PopoverContent>
+                      </Popover>
+                    )}
+                </div>
                 <Textarea
                   className="grow resize-none"
                   id="input-query"

@@ -16,6 +16,17 @@ def get_all_tables():
     return result
 
 
+@router.post("/columns")
+def get_all_tables(query: query_model.GetColumnsNames):
+    result = {}
+    for table_name in query.table_names:
+        names = database.DatabaseGeneric.get_all_columns(table_name)
+        result[table_name] = [name for obj in names for name in list(obj.values())]
+    if not result:
+        raise HTTPException(status_code=404, detail="Columns not found")
+    return result
+
+
 @router.post("/")
 def execute_sql(sql_query_obj: query_model.SQLQuery):
     if not check_sql.check_valid_sql(sql_query_obj.sql_query):

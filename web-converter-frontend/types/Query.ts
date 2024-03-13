@@ -25,6 +25,10 @@ export type TableName = {
   table_name: string;
 };
 
+export type TableNames = {
+  table_names: string[];
+};
+
 export type SQLQuery = {
   sql_query: string;
 };

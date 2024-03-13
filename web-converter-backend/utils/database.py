@@ -128,6 +128,13 @@ class DatabaseGeneric:
                 return curs.fetchall()
 
     @staticmethod
+    def get_all_columns(table_name: str):
+        with conn:
+            with conn.cursor() as curs:
+                curs.execute(f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table_name}';")
+                return curs.fetchall()
+
+    @staticmethod
     def execute_sql(sql_query: str):
         with conn:
             with conn.cursor() as curs:
