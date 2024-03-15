@@ -27,8 +27,8 @@ def convert_query_algebra(conn, query: query_model.ConvertQuery):
         with conn:
             with conn.cursor() as curs:
                 curs.execute(sql)
-                for i in cur:
-                    query.target_list += aGL_VAR[0] + "." + i[0] + ","
+                for i in curs:
+                    query.target_list += aGL_VAR[0] + "." + i['column_name'] + ","
                 query.target_list = query.target_list.rstrip(",")
     
     wQ0 = aQB_QWB[0].replace(") ", ")")
@@ -146,8 +146,8 @@ def convert_query_tuple(conn, query: query_model.ConvertQuery):
         with conn:
             with conn.cursor() as curs:
                 curs.execute(sql)
-                for i in curs.fetchall():
-                    query.target_list += target_list_variables[0] + "." + i[0] + ","
+                for i in curs:
+                    query.target_list += target_list_variables[0] + "." + i['column_name'] + ","
                 query.target_list = query.target_list.rstrip(",")
 
     keywords = converter_funcs.tuple_keywords_generator(query.query_body, 1)
